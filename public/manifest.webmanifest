@@ -1,0 +1,14 @@
+{
+  "name": "Conferir — Verificação de faturas",
+  "short_name": "Conferir",
+  "description": "Conferência de faturas e stock no seu dispositivo.",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#f8f9f6",
+  "theme_color": "#172e2b",
+  "icons": [
+    { "src": "./icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" },
+    { "src": "./icon-maskable.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "maskable" }
+  ]
+}
