@@ -5,6 +5,7 @@ import pdfWorker from 'pdfjs-dist/build/pdf.worker.min.mjs?url';
 import { parseInvoicePages } from './pdf-parser.js';
 import { describeDifference } from './difference.js';
 import { formatElapsed, getVerification, setVerificationState, VERIFICATION_STATES } from './verification.js';
+import { filterArticles, hasArticleDifferences, isArticleComplete, isArticleReconciled } from './article-list.js';
 
 pdfjs.GlobalWorkerOptions.workerSrc = pdfWorker;
 const icons = { Check, LayoutDashboard, History, Settings2, Sparkles, ChevronRight, CalendarDays, Plus, ArrowUpRight, FileCheck2, Clock3, PackageCheck, ArrowRight, FileText, Files, Search, Database, Download, Upload, Smartphone, ArrowLeft, RotateCcw, Trash2, ScanLine, Info, MessageSquareText, Package, Layers3 };
@@ -21,6 +22,8 @@ let invoices = [];
 let currentPage = 'inicio';
 let currentId = null;
 let search = '';
+let articleSearch = '';
+let articleFilter = '';
 let deferredInstall = null;
 let storageAvailable = true;
 
@@ -57,8 +60,8 @@ const dateTime = (value) => new Intl.DateTimeFormat('pt-PT', { dateStyle: 'mediu
 const today = () => new Intl.DateTimeFormat('pt-PT', { weekday: 'long', day: 'numeric', month: 'long' }).format(new Date());
 const newArticle = (data = {}) => ({ id: crypto.randomUUID(), reference: '', description: '', invoiced: '', received: '', systemStock: '', shelfStock: '', note: '', verification: { state: 'not-started', startedAt: null, completedAt: null }, ...data });
 const hasNumber = (value) => value !== '' && value !== null && value !== undefined && Number.isFinite(Number(value)) && Number(value) >= 0;
-const checked = (article) => article.reference.trim() && hasNumber(article.invoiced) && hasNumber(article.received) && hasNumber(article.systemStock) && hasNumber(article.shelfStock);
-const difference = (article) => checked(article) && (Number(article.invoiced) !== Number(article.received) || Number(article.systemStock) !== Number(article.shelfStock));
+const checked = isArticleComplete;
+const difference = hasArticleDifferences;
 const progress = (invoice) => invoice.articles.filter(checked).length;
 const initials = (name) => (name || 'F').trim().slice(0, 2).toUpperCase();
 
@@ -126,6 +129,7 @@ function settingsPage() {
 function articleCard(article, index, readonly) {
   const complete = checked(article);
   const mismatch = difference(article);
+  const reconciled = isArticleReconciled(article);
   const verification = getVerification(article);
   const verificationStateLabels = { 'not-started': 'Não iniciada', 'in-progress': 'A verificar', done: 'Verificada' };
   const verificationControls = VERIFICATION_STATES.map((state) => `<button class="verification-step ${verification.state === state ? `selected ${state}` : ''}" data-action="set-verification" data-state="${state}" aria-pressed="${verification.state === state}" ${readonly ? 'disabled' : ''}>${verificationStateLabels[state]}</button>`).join('');
@@ -138,7 +142,7 @@ function articleCard(article, index, readonly) {
     return `<strong class="difference-value ${result.kind}" aria-label="Diferença ${label}: ${esc(result.text)}, ${result.description}" title="Diferença ${label}: ${esc(result.text)}">${esc(result.text)}</strong>`;
   };
   const input = (field, label, placeholder = '—', badge = '') => `<label><span class="field-label">${label}${badge}</span><input type="number" min="0" step="any" inputmode="decimal" data-field="${field}" value="${esc(article[field])}" placeholder="${placeholder}" ${readonly ? 'disabled' : ''}></label>`;
-  return `<article class="article-card ${readonly ? 'is-completed' : ''}" data-article="${esc(article.id)}"><div class="article-top"><div class="article-heading"><span class="article-number">${String(index + 1).padStart(2, '0')}</span><div><input class="reference-input" data-field="reference" value="${esc(article.reference)}" placeholder="Introduza a referência" aria-label="Referência do artigo" ${readonly ? 'disabled' : ''}></div></div><div class="article-actions"><span class="article-status ${mismatch ? 'mismatch' : complete ? 'verified' : ''}">${mismatch ? 'Com diferenças' : complete ? 'Conferido' : 'Por conferir'}</span><button class="icon-button ${article.note ? 'has-note' : ''}" data-action="note" title="Adicionar ou editar nota" aria-label="Adicionar ou editar nota">${icon('message-square-text', 18)}</button>${!readonly ? `<button class="icon-button remove" data-action="remove-article" title="Remover artigo" aria-label="Remover artigo">${icon('trash-2', 17)}</button>` : ''}</div></div>
+  return `<article class="article-card ${readonly ? 'is-completed' : ''}" data-article="${esc(article.id)}"><div class="article-top"><div class="article-heading"><span class="article-number">${String(index + 1).padStart(2, '0')}</span><div><input class="reference-input" data-field="reference" value="${esc(article.reference)}" placeholder="Introduza a referência" aria-label="Referência do artigo" ${readonly ? 'disabled' : ''}></div></div><div class="article-actions">${readonly ? `<label class="reconcile-check"><input type="checkbox" data-action="toggle-reconciled" ${reconciled ? 'checked' : ''}><span>Check</span></label>` : ''}<span class="article-status ${mismatch ? 'mismatch' : complete ? 'verified' : ''}">${mismatch ? 'Com diferenças' : complete ? 'Conferido' : 'Por conferir'}</span><button class="icon-button ${article.note ? 'has-note' : ''}" data-action="note" title="Adicionar ou editar nota" aria-label="Adicionar ou editar nota">${icon('message-square-text', 18)}</button>${!readonly ? `<button class="icon-button remove" data-action="remove-article" title="Remover artigo" aria-label="Remover artigo">${icon('trash-2', 17)}</button>` : ''}</div></div>
     <div class="verification-control" role="group" aria-label="Estado da verificação desta referência">${verificationControls}</div>
     <div class="article-fields"><div class="field-group"><div class="field-group-title">${icon('package', 15)} QUANTIDADES</div><div class="field-pair">${input('invoiced', 'Faturada', '0')}${input('received', 'Recebida', 'Introduzir', readonly ? differenceBadge(article.received, article.invoiced, 'recebida − faturada') : '')}</div></div><div class="field-divider"></div><div class="field-group"><div class="field-group-title">${icon('layers-3', 15)} STOCK</div><div class="field-pair">${input('systemStock', 'No sistema', 'Introduzir')}${input('shelfStock', 'Na prateleira', 'Introduzir', readonly ? differenceBadge(article.shelfStock, article.systemStock, 'prateleira − sistema') : '')}</div></div></div>
     <div class="note-area ${article.note || verification.startedAt ? '' : 'hidden'}"><label>NOTA / DESCRIÇÃO<textarea data-field="note" placeholder="Adicione uma nota sobre este artigo..." ${readonly ? 'disabled' : ''}>${esc(article.note)}</textarea></label>${verificationLog}</div></article>`;
@@ -150,12 +154,21 @@ function detailPage(invoice) {
   const differences = invoice.articles.filter(difference).length;
   const percent = total ? Math.round(done / total * 100) : 0;
   const readonly = invoice.status === 'done';
+  const filteredArticles = filterArticles(invoice.articles, {
+    query: articleSearch,
+    verificationState: readonly ? '' : articleFilter,
+    reconciliation: readonly ? articleFilter : ''
+  });
+  const articleFilterOptions = readonly
+    ? `<option value="" ${articleFilter === '' ? 'selected' : ''}>Sem filtro</option><option value="reconciled" ${articleFilter === 'reconciled' ? 'selected' : ''}>Acertadas / check</option><option value="unreconciled" ${articleFilter === 'unreconciled' ? 'selected' : ''}>Não acertadas / não check</option>`
+    : `<option value="" ${articleFilter === '' ? 'selected' : ''}>Sem filtro</option><option value="not-started" ${articleFilter === 'not-started' ? 'selected' : ''}>Não iniciada</option><option value="in-progress" ${articleFilter === 'in-progress' ? 'selected' : ''}>A verificar</option><option value="done" ${articleFilter === 'done' ? 'selected' : ''}>Verificada</option>`;
   return `<button class="back-link" data-action="back">${icon('arrow-left', 16)} Voltar</button><div class="detail-heading"><div><div class="eyebrow"><span></span> ${readonly ? 'CONFERÊNCIA CONCLUÍDA' : 'CONFERÊNCIA EM CURSO'}</div><h1>${esc(invoice.supplier || 'Nova fatura')}</h1><p>Fatura ${esc(invoice.number || 'sem número')} <span>·</span> ${date(invoice.createdAt)} <span>·</span> ${esc(invoice.fileName || 'Adicionada manualmente')}</p></div><div class="detail-buttons">${readonly ? '<button class="button button-outline" data-action="download-pdf">' + icon('download', 16) + ' Descarregar PDF</button><button class="button button-outline" data-action="reopen">' + icon('rotate-ccw', 16) + ' Reabrir</button>' : '<button class="button button-dark" data-action="finish">' + icon('check', 18) + ' Concluir verificação</button>'}<button class="icon-button delete-invoice" data-action="delete" title="Eliminar fatura" aria-label="Eliminar fatura">${icon('trash-2', 18)}</button></div></div>
     <div class="invoice-meta"><label>Fornecedor<input data-invoice-field="supplier" value="${esc(invoice.supplier)}" placeholder="Nome do fornecedor" ${readonly ? 'disabled' : ''}></label><label>Número da fatura<input data-invoice-field="number" value="${esc(invoice.number)}" placeholder="Número da fatura" ${readonly ? 'disabled' : ''}></label></div>
     <div class="detail-summary"><div><span>PROGRESSO DA VERIFICAÇÃO</span><strong class="summary-count">${done} <small>de ${total} artigos conferidos</small></strong></div><div class="summary-progress"><div class="progress-track"><div style="width:${percent}%"></div></div><span>${percent}%</span></div><div class="summary-difference"><span class="diff-icon">${icon('scan-line', 18)}</span><div><strong>${differences}</strong><small>com diferenças</small></div></div></div>
     <div class="section-label article-list-heading"><div><div class="eyebrow">HORA DE CONFERIR</div><h2>Artigos da fatura <span class="count">${total}</span></h2><p>Confirme as quantidades e o stock de cada artigo.</p></div>${readonly ? '' : '<button class="button button-outline" data-action="add-article">' + icon('plus', 17) + ' Adicionar artigo</button>'}</div>
+    <div class="article-toolbar"><label class="search">${icon('search', 18)}<input id="article-search" type="search" placeholder="Pesquisar referências..." value="${esc(articleSearch)}" aria-label="Pesquisar referências"></label><label class="article-filter">${icon('settings-2', 16)}<span class="visually-hidden">Filtrar referências</span><select id="article-filter" aria-label="Filtrar referências">${articleFilterOptions}</select></label></div>
     ${invoice.importWarning ? `<div class="notice">${icon('info', 18)} <span>${esc(invoice.importWarning)}</span></div>` : ''}
-    <div class="articles">${total ? invoice.articles.map((article, index) => articleCard(article, index, readonly)).join('') : empty('Ainda não há artigos', 'Adicione os artigos manualmente para começar.')}</div>
+    <div class="articles">${filteredArticles.length ? filteredArticles.map((article) => articleCard(article, invoice.articles.indexOf(article), readonly)).join('') : empty(total ? 'Nenhuma referência encontrada' : 'Ainda não há artigos', total ? 'Ajuste a pesquisa ou o filtro para ver referências.' : 'Adicione os artigos manualmente para começar.')}</div>
     ${!readonly && total ? '<div class="detail-bottom"><span>As alterações são guardadas neste dispositivo.</span><button class="button button-dark" data-action="finish">' + icon('check', 18) + ' Concluir verificação</button></div>' : ''}`;
 }
 
@@ -207,6 +220,27 @@ fileInput.addEventListener('change', () => importPdf(fileInput.files[0]));
 
 app.addEventListener('change', (event) => {
   const input = event.target;
+  if (input.id === 'article-filter') {
+    articleFilter = input.value;
+    render();
+    return;
+  }
+  if (input.dataset.action === 'toggle-reconciled') {
+    const invoice = invoices.find((item) => item.id === currentId);
+    const article = invoice?.articles.find((item) => item.id === input.closest('[data-article]').dataset.article);
+    if (!invoice || invoice.status !== 'done' || !article) return;
+    const hadSavedValue = typeof article.reconciled === 'boolean';
+    const previous = article.reconciled;
+    article.reconciled = !isArticleReconciled({ ...article, reconciled: previous });
+    if (!save()) {
+      if (hadSavedValue) article.reconciled = previous;
+      else delete article.reconciled;
+      input.checked = isArticleReconciled(article);
+      return;
+    }
+    render();
+    return;
+  }
   const card = input.closest('[data-article]');
   const invoice = invoices.find((item) => item.id === currentId);
   if (invoice && invoice.status !== 'done' && ['supplier', 'number'].includes(input.dataset.invoiceField)) {
@@ -248,11 +282,12 @@ app.addEventListener('change', (event) => {
 });
 
 app.addEventListener('input', (event) => {
-  if (event.target.id !== 'search') return;
-  search = event.target.value;
+  if (!['search', 'article-search'].includes(event.target.id)) return;
+  if (event.target.id === 'search') search = event.target.value;
+  else articleSearch = event.target.value;
   const position = event.target.selectionStart;
   render();
-  const field = document.querySelector('#search');
+  const field = document.getElementById(event.target.id);
   field.focus();
   field.setSelectionRange(position, position);
 });
@@ -280,8 +315,8 @@ app.addEventListener('click', async (event) => {
   }
   if (action === 'home') { event.preventDefault(); currentPage = 'inicio'; currentId = null; render(); }
   if (action === 'import') fileInput.click();
-  if (action === 'open') { currentId = target.dataset.id; render(); window.scrollTo(0, 0); }
-  if (action === 'back') { currentId = null; render(); window.scrollTo(0, 0); }
+  if (action === 'open') { currentId = target.dataset.id; articleSearch = ''; articleFilter = ''; render(); window.scrollTo(0, 0); }
+  if (action === 'back') { currentId = null; articleSearch = ''; articleFilter = ''; render(); window.scrollTo(0, 0); }
   if (action === 'note') {
     const area = target.closest('.article-card').querySelector('.note-area');
     area.classList.toggle('hidden');
@@ -312,11 +347,31 @@ app.addEventListener('click', async (event) => {
     }
     const count = invoice.articles.filter(difference).length;
     if (count && !confirm(`Existem ${count} artigo(s) com diferenças. Deseja concluir mesmo assim?`)) return;
+    const previousChecks = invoice.articles.map((article) => article.reconciled);
+    const previousFilter = articleFilter;
     invoice.status = 'done';
-    if (!save()) invoice.status = 'ongoing';
+    articleFilter = '';
+    invoice.articles.forEach((article) => { article.reconciled = !difference(article); });
+    if (!save()) {
+      invoice.status = 'ongoing';
+      articleFilter = previousFilter;
+      invoice.articles.forEach((article, index) => {
+        if (typeof previousChecks[index] === 'boolean') article.reconciled = previousChecks[index];
+        else delete article.reconciled;
+      });
+    }
     render();
   }
-  if (action === 'reopen' && invoice) { invoice.status = 'ongoing'; if (!save()) invoice.status = 'done'; render(); }
+  if (action === 'reopen' && invoice) {
+    invoice.status = 'ongoing';
+    const previousFilter = articleFilter;
+    articleFilter = '';
+    if (!save()) {
+      invoice.status = 'done';
+      articleFilter = previousFilter;
+    }
+    render();
+  }
   if (action === 'delete' && invoice && confirm('Eliminar esta fatura e todos os seus dados?')) {
     const index = invoices.indexOf(invoice);
     invoices.splice(index, 1);
@@ -348,7 +403,7 @@ app.addEventListener('click', async (event) => {
           ['ongoing', 'done'].includes(item.status) && typeof item.number === 'string' && typeof item.supplier === 'string' &&
           typeof item.fileName === 'string' && Array.isArray(item.articles) && item.articles.every((article) =>
             typeof article.id === 'string' && typeof article.reference === 'string' && typeof article.description === 'string' &&
-            typeof article.note === 'string' && ['invoiced', 'received', 'systemStock', 'shelfStock'].every((key) => article[key] === '' || hasNumber(article[key])) &&
+            typeof article.note === 'string' && (article.reconciled === undefined || typeof article.reconciled === 'boolean') && ['invoiced', 'received', 'systemStock', 'shelfStock'].every((key) => article[key] === '' || hasNumber(article[key])) &&
             (!article.verification || (
               VERIFICATION_STATES.includes(article.verification.state) &&
               (article.verification.startedAt === null || (typeof article.verification.startedAt === 'string' && !Number.isNaN(Date.parse(article.verification.startedAt)))) &&

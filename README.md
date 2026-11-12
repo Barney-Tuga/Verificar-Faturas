@@ -18,6 +18,8 @@ Preencha a quantidade recebida e os dois valores de stock; zero é um valor vál
 
 Ao abrir uma fatura concluída no histórico, cada artigo apresenta a diferença entre a quantidade recebida e a faturada e entre o stock na prateleira e o do sistema. Valores negativos aparecem a vermelho, zero a azul e valores positivos a verde.
 
+Na fatura, pesquise referências e filtre pelo estado da verificação. Depois de concluir, as referências sem diferenças ficam automaticamente assinaladas; pode alterar cada check manualmente e filtrar os artigos acertados ou por acertar.
+
 Cada referência tem também três estados de verificação: não iniciada, a verificar e verificada. Ao iniciar ou concluir, a aplicação guarda a data e hora; enquanto estiver a verificar, mostra o tempo decorrido. O registo é apresentado junto à nota/descrição e incluído nas cópias de segurança. Repor o estado para «Não iniciada» apaga os horários, após confirmação.
 
 Nas faturas concluídas, o botão «Descarregar PDF» exporta um relatório tabular em formato horizontal com as referências, quantidades, diferenças, nota/descrição, horários e duração de cada verificação. Os cabeçalhos repetem-se nas páginas seguintes.
