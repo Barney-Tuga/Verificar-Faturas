@@ -37,4 +37,17 @@
 .reconcile-check{display:flex;align-items:center;gap:5px;color:#729477;font-size:10px;font-weight:700;cursor:pointer;white-space:nowrap}
 .reconcile-check input{width:16px;height:16px;margin:0;accent-color:#4f8a5d;cursor:pointer}
 .article-card.is-completed .article-status{display:none}
+.article-card.is-completed.visual-checked{background:#dcecff;border-color:#a9c9ee;color:#173b63}
+.article-card.is-completed.visual-checked .article-number{background:#c9e0fb;color:#20558a}
+.article-card.is-completed.visual-checked .reference-input:disabled,.article-card.is-completed.visual-checked .article-fields input:disabled,.article-card.is-completed.visual-checked .note-area textarea:disabled{background:#e8f2ff;color:#244b73}
+.article-card.is-completed.visual-checked .field-group-title,.article-card.is-completed.visual-checked .note-area label,.article-card.is-completed.visual-checked .verification-log{color:#496d91}
+.article-card.is-completed.visual-checked .verification-log{border-color:#c5dcf4}
+.article-card.is-completed.visual-positive{background:#e7f5e8;border-color:#c4e3c7}
+.article-card.is-completed.visual-positive .article-number{background:#d7edd9;color:#3f7849}
+.article-card.is-completed.visual-positive .reference-input:disabled,.article-card.is-completed.visual-positive .article-fields input:disabled,.article-card.is-completed.visual-positive .note-area textarea:disabled{background:#f0f8f0;color:#3c6543}
+.article-card.is-completed.visual-negative{background:#fdeaea;border-color:#efc4c4}
+.article-card.is-completed.visual-negative .article-number{background:#f8dada;color:#a14949}
+.article-card.is-completed.visual-negative .reference-input:disabled,.article-card.is-completed.visual-negative .article-fields input:disabled,.article-card.is-completed.visual-negative .note-area textarea:disabled{background:#fff2f2;color:#874646}
+.article-card.is-completed.visual-checked .article-fields,.article-card.is-completed.visual-positive .article-fields,.article-card.is-completed.visual-negative .article-fields{border-color:#00000012}
+.article-card.is-completed.visual-checked .verification-control,.article-card.is-completed.visual-positive .verification-control,.article-card.is-completed.visual-negative .verification-control{background:#ffffffaa}
 @media(max-width:500px){.article-toolbar{align-items:stretch}.article-toolbar .search{max-width:none;min-width:0}.article-filter{padding:0 8px;gap:5px}.article-filter select{max-width:145px;font-size:10px}.article-actions{flex-wrap:wrap;justify-content:end}.reconcile-check{font-size:9px}}

@@ -14,6 +14,18 @@ export function hasArticleDifferences(article) {
       || Number(article.systemStock) !== Number(article.shelfStock));
 }
 
+export function getArticleVisualState(article) {
+  if (isArticleReconciled(article)) return 'checked';
+  if (!isArticleComplete(article)) return 'neutral';
+  if (Number(article.received) !== Number(article.invoiced)) {
+    return Number(article.received) > Number(article.invoiced) ? 'positive' : 'negative';
+  }
+  if (Number(article.shelfStock) !== Number(article.systemStock)) {
+    return Number(article.shelfStock) > Number(article.systemStock) ? 'positive' : 'negative';
+  }
+  return 'neutral';
+}
+
 export function isArticleReconciled(article) {
   return typeof article.reconciled === 'boolean' ? article.reconciled : !hasArticleDifferences(article);
 }

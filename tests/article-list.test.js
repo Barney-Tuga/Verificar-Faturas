@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { filterArticles, hasArticleDifferences, isArticleReconciled } from '../src/article-list.js';
+import { filterArticles, getArticleVisualState, hasArticleDifferences, isArticleReconciled } from '../src/article-list.js';
 
 const article = (overrides = {}) => ({
   id: 'item-1',
@@ -33,6 +33,16 @@ test('assinala automaticamente referências sem diferenças e deixa diferenças 
 test('preserva checks definidos manualmente', () => {
   assert.equal(isArticleReconciled(article({ shelfStock: 6, reconciled: true })), true);
   assert.equal(isArticleReconciled(article({ reconciled: false })), false);
+});
+
+test('define cores com prioridade para check, depois pela primeira diferença em quantidade ou stock', () => {
+  assert.equal(getArticleVisualState(article()), 'checked');
+  assert.equal(getArticleVisualState(article({ shelfStock: 6 })), 'positive');
+  assert.equal(getArticleVisualState(article({ shelfStock: 4 })), 'negative');
+  assert.equal(getArticleVisualState(article({ received: 11, shelfStock: 4 })), 'positive');
+  assert.equal(getArticleVisualState(article({ received: 9, shelfStock: 6 })), 'negative');
+  assert.equal(getArticleVisualState(article({ shelfStock: 6, reconciled: true })), 'checked');
+  assert.equal(getArticleVisualState(article({ shelfStock: 4, reconciled: true })), 'checked');
 });
 
 test('filtra por referência, estado de verificação e estado do check', () => {
